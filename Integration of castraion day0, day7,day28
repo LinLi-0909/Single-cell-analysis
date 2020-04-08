@@ -1,0 +1,42 @@
+library(Seurat)
+CPLP <- Read10X('c0/filtered_gene_bc_matrices_mex/output1_genome/')
+C7 <- Read10X('c7/filtered_gene_bc_matrices/output1_genome/')
+C28 <- Read10X('c28/filtered_gene_bc_matrices/output1_genome/')
+dim(CPLP) #27999  8545
+dim(C7) # 27999  5734
+dim(C28) # 27999  3006
+cluster <- read.csv('cluster_new.csv',header = T)
+head(cluster)
+cluster1 <- c(cluster$cluster,rep('a',8740))
+length(cluster1)
+Day <- rep(c('day0','day7','day28'),c(8545,5734,3006))
+
+data <- cbind(CPLP,C7,C28)
+TY <- CreateSeuratObject(counts  = data, min.cells = 15, min.features = 200, 
+                         project = "10X_Intergration")
+TY
+TY$Day <- factor(Day,levels = c('day0','day7','day28'))
+TY.list <- SplitObject(TY, split.by = "Day")
+TY.list <- TY.list[c("day0", "day7", "day28")]
+for (i in 1:length(TY.list)) {
+  TY.list[[i]] <- NormalizeData(TY.list[[i]], verbose = FALSE)
+  TY.list[[i]] <- FindVariableFeatures(TY.list[[i]], selection.method = "vst", 
+                                             nfeatures = 2000, verbose = FALSE)
+}
+reference.list <- TY.list[c("day0", "day7", "day28")]
+TY.anchors <- FindIntegrationAnchors(object.list = reference.list, dims = 1:30)
+TY.integrated <- IntegrateData(anchorset = TY.anchors, dims = 1:30)
+# switch to integrated assay. The variable features of this assay are automatically
+# set during IntegrateData
+library(ggplot2)
+library(cowplot)
+# switch to integrated assay. The variable features of this assay are automatically
+# set during IntegrateData
+DefaultAssay(TY.integrated) <- "integrated"
+TY.integrated <- ScaleData(TY.integrated, verbose = FALSE)
+TY.integrated <- RunPCA(TY.integrated, npcs = 30, verbose = FALSE)
+TY.integrated <- RunTSNE(TY.integrated, reduction = "pca", dims = 1:30)
+DimPlot(TY.integrated, reduction = "tsne", group.by = "Day")
+TY.integrated <- FindNeighbors(object = TY.integrated, dims = 1:30)
+TY.integrated <- FindClusters(object = TY.integrated, resolution = 0.05)
+DimPlot(TY.integrated, reduction = "tsne",label = T)
