@@ -1,0 +1,39 @@
+library(ggplot2)
+library(Seurat)
+library(dplyr)
+library(Matrix)
+luminal_group <- read.csv('/guo/2019/point to point/human_prostate/ALL/group_c4_c5.csv',header = T)
+head(luminal_group)
+d <- Read10X(data.dir = "/guo/human/pd/")
+dim(d) #33694 35865
+head(d[,1:5])
+luminal <- d[,colnames(d)%in%luminal_group$X]
+rm(d)
+head(luminal[,1:4])
+dim(luminal) #33694  4039
+luminal <- read.csv('luminal_count.csv',header = T,row.names = 1)
+dim(luminal)
+luminal <- CreateSeuratObject(counts  = luminal, min.cells = 3, min.features = 200, 
+                              project = "10X_luminal")
+luminal #18045 features across 4039 samples within 1 assay 
+mito.features <- grep(pattern = "^MT-", x = rownames(x = luminal), value = TRUE)
+percent.mito <- Matrix::colSums(x = GetAssayData(object = luminal, slot = 'counts')[mito.features, ]) / Matrix::colSums(x = GetAssayData(object = luminal, slot = 'counts'))
+luminal[['percent.mito']] <- percent.mito
+VlnPlot(object = luminal, features = c("nFeature_RNA", "nCount_RNA", "percent.mito"), ncol = 3)
+FeatureScatter(object = luminal, feature1 = "nCount_RNA", feature2 = "percent.mito")
+FeatureScatter(object = luminal, feature1 = "nCount_RNA", feature2 = "nFeature_RNA")
+luminal <- NormalizeData(object = luminal, normalization.method = "LogNormalize", scale.factor = 1e4)
+luminal <- FindVariableFeatures(object = luminal, selection.method = 'mean.var.plot', mean.cutoff = c(0.0125, 6), dispersion.cutoff = c(1, Inf))
+length(x = VariableFeatures(object = luminal))
+luminal <- ScaleData(object = luminal, features = rownames(x = luminal))
+luminal <- RunPCA(object = luminal, features = VariableFeatures(object = luminal), verbose = FALSE)
+print(x = luminal[['pca']], dims = 1:5, nfeatures = 5, projected = FALSE)
+DimPlot(object = luminal)
+luminal <- JackStraw(object = luminal, num.replicate = 100)
+luminal <- ScoreJackStraw(object = luminal, dims = 1:10)
+JackStrawPlot(object = luminal, dims = 1:10)
+luminal <- FindNeighbors(object = luminal, dims = 1:10)
+luminal <- FindClusters(object = luminal, resolution = 0.1)# 4 clusters
+luminal <- RunTSNE(object = luminal, dims = 1:10)
+DimPlot(object = luminal, reduction = "tsne",pt.size=1.5,label = T)
+markers <- FindAllMarkers(luminal, only.pos = TRUE, min.pct = 0.25, logfc.threshold = 0.5)
