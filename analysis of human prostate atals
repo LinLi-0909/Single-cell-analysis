@@ -1,0 +1,33 @@
+library(Seurat)
+human.data <- Read10X('filtered_gene_bc_matrices_mex/GRCh38/')
+dim(human.data) #33538 11413
+
+
+human <- CreateSeuratObject(counts = human.data, project = "human_prostate", min.cells = 10, min.features = 500)
+human #18497 features across 11409 samples within 1 assay 
+human[["percent.mt"]] <- PercentageFeatureSet(human, pattern = "^MT-")
+VlnPlot(human, features = c("nFeature_RNA", "nCount_RNA", "percent.mt"), ncol = 3)
+human <- subset(human, subset = nFeature_RNA > 500 & nFeature_RNA < 8000 & percent.mt < 20 & nCount_RNA < 50000)
+human #18497 features across 11374 samples within 1 assay
+human <- NormalizeData(human, normalization.method = "LogNormalize", scale.factor = 100000)
+
+human <- FindVariableFeatures(human, selection.method = "mean.var.plot", nfeatures = 3000)
+
+# Identify the 10 most highly variable genes
+top10 <- head(VariableFeatures(human), 10)
+top10
+
+all.genes <- rownames(human)
+human <- ScaleData(human, features = all.genes)
+human <- RunPCA(human, features = VariableFeatures(object = human))
+DimPlot(human, reduction = "pca")
+human <- JackStraw(human, num.replicate = 100)
+human <- ScoreJackStraw(human, dims = 1:20)
+JackStrawPlot(human, dims = 1:15)
+ElbowPlot(human)
+##tsne
+human <- RunTSNE(human, dims = 1:15)
+human <- FindNeighbors(human, reduction = "pca", dims = 1:13)
+human<- FindClusters(human, resolution = 0.1,algorithm = 3)
+DimPlot(human, reduction = "tsne",label = T,pt.size = 0.5)
+DimPlot(human, reduction = "tsne",label = F,pt.size = 0.5)
