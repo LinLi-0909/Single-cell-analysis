@@ -1,0 +1,12 @@
+library(Seurat)
+library(dplyr)
+Luminal <- readRDS('human_Luminal.rds')
+Luminal <- FindVariableFeatures(Luminal, selection.method = "vst", nfeatures = 2000)
+Luminal <- RunPCA(Luminal, features = VariableFeatures(object = Luminal))
+DimPlot(Luminal, reduction = "pca")
+ElbowPlot(Luminal)
+##tsne
+Luminal <- RunTSNE(Luminal, dims = 1:12)
+Luminal <- FindNeighbors(Luminal, reduction = "pca", dims = 1:12)
+Luminal <- FindClusters(Luminal, resolution = 0.15)
+DimPlot(Luminal, reduction = "tsne",label = T,pt.size = 0.5)
