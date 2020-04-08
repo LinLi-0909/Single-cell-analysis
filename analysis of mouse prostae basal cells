@@ -1,0 +1,52 @@
+library(ggplot2)
+library(Seurat)
+library(dplyr)
+library(Matrix)
+data <- Read10X(data.dir = "outs+YFP/outs/filtered_gene_bc_matrices_mex/output1_genome/")
+dim(data)
+cluster <- read.csv('cluster_new.csv',header = T)
+head(cluster)
+basal <- data[,cluster$cluster==3]
+dim(basal)
+write.csv(basal,'basal.csv')
+
+basal <- read.csv('basal.csv',header = T,row.names = 1)
+basal <- CreateSeuratObject(counts  = basal, min.cells = 3, min.features = 200, 
+                           project = "10X_basal")
+basal
+# 13876 features across 747 samples within 1 assay 
+##QC and selecting cells for further analysis
+mito.features <- grep(pattern = "^mt-", x = rownames(x = basal), value = TRUE)
+percent.mito <- Matrix::colSums(x = GetAssayData(object = basal, slot = "counts")[mito.features,
+                                                                                 ])/Matrix::colSums(x = GetAssayData(object =basal, slot = "counts"))
+
+# The [[ operator can add columns to object metadata, and is a great place
+# to stash QC stats
+basal[["percent.mito"]] <- percent.mito
+VlnPlot(object =basal, features = c("nFeature_RNA", "nCount_RNA", "percent.mito"),
+        ncol = 3)
+FeatureScatter(object = basal, feature1 = "nCount_RNA", feature2 = "nFeature_RNA")
+FeatureScatter(object = basal, feature1 = "nCount_RNA", feature2 = "percent.mito")
+basal <- subset(x = basal, subset = nFeature_RNA > 200  & nFeature_RNA < 5000)
+basal #16401 features across 8541 samples within 1 assay 
+#%16401 features across 8537 samples within 1 assay 
+
+basal <- NormalizeData(object = basal, normalization.method = "LogNormalize",
+                             scale.factor = 100000)
+##Detection of variable genes across the single cells
+basal <- FindVariableFeatures(object = basal, selection.method = "mean.var.plot",
+                             mean.cutoff = c(0.25, 8), dispersion.cutoff = c(0.5, 10))
+
+basal <- ScaleData(object = basal, features = rownames(x = basal),vars.to.regress = c("nCount_RNA", "percent.mito"))
+#Scaling the data and removing unwanted sources of variation
+basal <- RunPCA(object = basal, features = VariableFeatures(object =basal))
+DimPlot(object = basal)
+basal <- ProjectDim(object = basal)
+basal <- JackStraw(object = basal, num.replicate = 100)
+basal <- ScoreJackStraw(object = basal, dims = 1:10)
+JackStrawPlot(object = basal, dims = 1:10)
+ElbowPlot(object = basal)
+basal <- FindNeighbors(object = basal, dims = 1:10)
+basal <- FindClusters(object = basal, resolution = 0.16)
+basal <- RunTSNE(object = basal, dims = 1:10)
+DimPlot(object = basal, reduction = "tsne", label = TRUE, pt.size = 2)
