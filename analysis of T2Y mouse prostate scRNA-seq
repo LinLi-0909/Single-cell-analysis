@@ -1,0 +1,48 @@
+rm(list=ls())
+library(ggplot2)
+library(Seurat)
+library(dplyr)
+library(Matrix)
+data <- Read10X(data.dir = "outs+YFP/outs/filtered_gene_bc_matrices_mex/output1_genome/")
+dim(data)
+phentype <- read.csv('figure/seruat/phentype.csv',header = T,row.names = 1)
+CPLP <- CreateSeuratObject(counts  = data, min.cells = 8, min.features = 200, 
+                           project = "10X",meta.data = phentype)
+CPLP
+# 16401 features across 8545 samples within 1 assay 
+##QC and selecting cells for further analysis
+mito.features <- grep(pattern = "^mt-", x = rownames(x = CPLP), value = TRUE)
+percent.mito <- Matrix::colSums(x = GetAssayData(object = CPLP, slot = "counts")[mito.features,
+                                                                                 ])/Matrix::colSums(x = GetAssayData(object =CPLP, slot = "counts"))
+
+# The [[ operator can add columns to object metadata, and is a great place
+# to stash QC stats
+CPLP[["percent.mito"]] <- percent.mito
+VlnPlot(object =CPLP, features = c("nFeature_RNA", "nCount_RNA", "percent.mito"),
+        ncol = 3)
+FeatureScatter(object = CPLP, feature1 = "nCount_RNA", feature2 = "nFeature_RNA")
+FeatureScatter(object = CPLP, feature1 = "nCount_RNA", feature2 = "percent.mito")
+CPLP <- subset(x = CPLP, subset = nFeature_RNA > 200  )
+CPLP #16401 features across 8541 samples within 1 assay 
+#%16401 features across 8537 samples within 1 assay 
+
+CPLP <- NormalizeData(object = CPLP, normalization.method = "LogNormalize",
+                             scale.factor = 100000)
+##Detection of variable genes across the single cells
+CPLP <- FindVariableFeatures(object = CPLP, selection.method = "mean.var.plot",
+                             mean.cutoff = c(0.0125, 5), dispersion.cutoff = c(0.5, 8))
+
+
+CPLP <- ScaleData(object = CPLP, features = rownames(x = CPLP),vars.to.regress = c("nCount_RNA"))
+#Scaling the data and removing unwanted sources of variation
+CPLP <- RunPCA(object = CPLP, features = VariableFeatures(object =CPLP))
+DimPlot(object = CPLP)
+CPLP <- ProjectDim(object = CPLP)
+CPLP <- JackStraw(object = CPLP, num.replicate = 100)
+CPLP <- ScoreJackStraw(object = CPLP, dims = 1:10)
+JackStrawPlot(object = CPLP, dims = 1:10)
+ElbowPlot(object = CPLP)
+
+CPLP <- FindNeighbors(object = CPLP, dims = 1:10)
+CPLP <- FindClusters(object = CPLP, resolution = 0.16)
+CPLP <- RunTSNE(object = CPLP, dims = 1:10)
