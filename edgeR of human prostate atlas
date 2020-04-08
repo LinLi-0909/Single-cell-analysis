@@ -1,0 +1,115 @@
+library(edgeR)
+data <- read.csv('data_count.csv',header = T,row.names = 1)
+dim(data)##19859  8546
+gene_name <- read.csv('gene_name.csv',header=T)
+cluster <- read.csv('cluster.csv',header = T)
+group <- cluster$cluster
+
+group[group==0] ='c0'
+group[group==1] ='c1'
+group[group==2] ='c2'
+group[group==3] ='c3'
+group[group==4] ='c4'
+group[group==5] ='c5'
+group[group==6] ='c6'
+
+group <- as.factor(group)
+
+y<-DGEList(counts=data,group=group,genes=rownames(data))
+dge <- calcNormFactors(y)
+design <- model.matrix(~0+group)
+colnames(design) <- levels(group)
+dge <- estimateDisp(dge, design,robust=TRUE)
+fit <- glmQLFit(dge,design,robust=TRUE)
+sig_cut=0.05
+
+AB<-makeContrasts(A=c0-c1,levels = design)
+AC<-makeContrasts(A=c0-c2,levels = design)
+AD<-makeContrasts(A=c0-c3,levels = design)
+AE<-makeContrasts(A=c0-c4,levels = design)
+AF<-makeContrasts(A=c0-c5,levels = design)
+AG<-makeContrasts(A=c0-c6,levels = design)
+lrtAB <- glmQLFTest(fit, contrast=AB)
+lrtAC <- glmQLFTest(fit, contrast=AC)
+lrtAD <- glmQLFTest(fit, contrast=AD)
+lrtAE <- glmQLFTest(fit, contrast=AE)
+lrtAF <- glmQLFTest(fit, contrast=AF)
+lrtAG <- glmQLFTest(fit, contrast=AG)
+diffAB<-topTags(lrtAB,n=40000,adjust.method="BH", sort.by="PValue", p.value=sig_cut)$table
+diffAC<-topTags(lrtAC,n=40000,adjust.method="BH", sort.by="PValue", p.value=sig_cut)$table
+diffAD<-topTags(lrtAD,n=40000,adjust.method="BH", sort.by="PValue", p.value=sig_cut)$table
+diffAE<-topTags(lrtAE,n=40000,adjust.method="BH", sort.by="PValue", p.value=sig_cut)$table
+diffAF<-topTags(lrtAF,n=40000,adjust.method="BH", sort.by="PValue", p.value=sig_cut)$table
+diffAG<-topTags(lrtAG,n=40000,adjust.method="BH", sort.by="PValue", p.value=sig_cut)$table
+write.csv(diffAB,'sig_c0_c1.csv')
+write.csv(diffAC,'sig_c0_c2.csv')
+write.csv(diffAD,'sig_c0_c3.csv')
+write.csv(diffAE,'sig_c0_c4.csv')
+write.csv(diffAF,'sig_c0_c5.csv')
+write.csv(diffAG,'sig_c0_c6.csv')
+BC <-makeContrasts(A=c1-c2,levels = design)
+BD <-makeContrasts(A=c1-c3,levels = design)
+BE <-makeContrasts(A=c1-c4,levels = design)
+BF <-makeContrasts(A=c1-c5,levels = design)
+BG <-makeContrasts(A=c1-c6,levels = design)
+
+lrtBC <- glmQLFTest(fit, contrast=BC)
+lrtBD <- glmQLFTest(fit, contrast=BD)
+lrtBE <- glmQLFTest(fit, contrast=BE)
+lrtBF <- glmQLFTest(fit, contrast=BF)
+lrtBG <- glmQLFTest(fit, contrast=BG)
+diffBC<-topTags(lrtBC,n=40000,adjust.method="BH", sort.by="PValue", p.value=sig_cut)$table
+diffBD<-topTags(lrtBD,n=40000,adjust.method="BH", sort.by="PValue", p.value=sig_cut)$table
+diffBE<-topTags(lrtBE,n=40000,adjust.method="BH", sort.by="PValue", p.value=sig_cut)$table
+diffBF<-topTags(lrtBF,n=40000,adjust.method="BH", sort.by="PValue", p.value=sig_cut)$table
+diffBG<-topTags(lrtBG,n=40000,adjust.method="BH", sort.by="PValue", p.value=sig_cut)$table
+write.csv(diffBC,'sig_c1_c2.csv')
+write.csv(diffBD,'sig_c1_c3.csv')
+write.csv(diffBE,'sig_c1_c4.csv')
+write.csv(diffBF,'sig_c1_c5.csv')
+write.csv(diffBG,'sig_c1_c6.csv')
+CD <-makeContrasts(A=c2-c3,levels = design)
+CE <-makeContrasts(A=c2-c4,levels = design)
+CF <-makeContrasts(A=c2-c5,levels = design)
+CG <-makeContrasts(A=c2-c6,levels = design)
+lrtCD <- glmQLFTest(fit, contrast=CD)
+lrtCE <- glmQLFTest(fit, contrast=CE)
+lrtCF <- glmQLFTest(fit, contrast=CF)
+lrtCG <- glmQLFTest(fit, contrast=CG)
+diffCD<-topTags(lrtCD,n=40000,adjust.method="BH", sort.by="PValue", p.value=sig_cut)$table
+diffCE<-topTags(lrtCE,n=40000,adjust.method="BH", sort.by="PValue", p.value=sig_cut)$table
+diffCF<-topTags(lrtCF,n=40000,adjust.method="BH", sort.by="PValue", p.value=sig_cut)$table
+diffCG<-topTags(lrtCG,n=40000,adjust.method="BH", sort.by="PValue", p.value=sig_cut)$table
+write.csv(diffCD,'sig_c2_c3.csv')
+write.csv(diffCE,'sig_c2_c4.csv')
+write.csv(diffCF,'sig_c2_c5.csv')
+write.csv(diffCG,'sig_c2_c6.csv')
+
+
+DE <-makeContrasts(A=c3-c4,levels = design)
+DF <-makeContrasts(A=c3-c5,levels = design)
+DG <-makeContrasts(A=c3-c6,levels = design)
+lrtDE <- glmQLFTest(fit, contrast=DE)
+lrtDF <- glmQLFTest(fit, contrast=DF)
+lrtDG <- glmQLFTest(fit, contrast=DG)
+
+diffDE<-topTags(lrtDE,n=40000,adjust.method="BH", sort.by="PValue", p.value=sig_cut)$table
+diffDF<-topTags(lrtDF,n=40000,adjust.method="BH", sort.by="PValue", p.value=sig_cut)$table
+diffDG<-topTags(lrtDG,n=40000,adjust.method="BH", sort.by="PValue", p.value=sig_cut)$table
+
+write.csv(diffDE,'sig_c3_c4.csv')
+write.csv(diffDF,'sig_c3_c5.csv')
+write.csv(diffDG,'sig_c3_c6.csv')
+EF <-makeContrasts(A=c4-c5,levels = design)
+EG <-makeContrasts(A=c4-c6,levels = design)
+lrtEF <- glmQLFTest(fit, contrast=EF)
+lrtEG <- glmQLFTest(fit, contrast=EG)
+diffEF<-topTags(lrtEF,n=40000,adjust.method="BH", sort.by="PValue", p.value=sig_cut)$table
+diffEG<-topTags(lrtEG,n=40000,adjust.method="BH", sort.by="PValue", p.value=sig_cut)$table
+write.csv(diffEF,'sig_c4_c5.csv')
+write.csv(diffEG,'sig_c4_c6.csv')
+FG <-makeContrasts(A=c5-c6,levels = design)
+lrtFG <- glmQLFTest(fit, contrast=FG)
+diffFG<-topTags(lrtFG,n=40000,adjust.method="BH", sort.by="PValue", p.value=sig_cut)$table
+write.csv(diffFG,'sig_c5_c6.csv')
+
