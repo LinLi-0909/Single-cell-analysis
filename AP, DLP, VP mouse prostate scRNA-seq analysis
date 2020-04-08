@@ -1,0 +1,26 @@
+rm(list = ls())
+library(Seurat)
+lobe <- Read10X('filtered_gene_bc_matrices_mex/mm10/')
+dim(lobe) #27998 13968
+lobe <- CreateSeuratObject(counts  = lobe, min.cells = 10, min.features = 200, 
+                         project = "10X_lobe")
+lobe
+mito.features <- grep(pattern = "^mt-", x = rownames(x = lobe), value = TRUE)
+percent.mito <- Matrix::colSums(x = GetAssayData(object = lobe, slot = "counts")[mito.features,])/Matrix::colSums(x = GetAssayData(object =lobe, slot = "counts"))
+lobe[["percent.mito"]] <- percent.mito    
+VlnPlot(object = lobe, features = c("nFeature_RNA", "nCount_RNA", "percent.mito"), ncol = 3)
+lobe <- subset(x = lobe, subset = nFeature_RNA > 200 &nFeature_RNA <=6000 & percent.mito<= 0.2 )
+lobe #16230 features across 13744 samples within 1 assay 
+lobe <- NormalizeData(object = lobe, normalization.method = "LogNormalize",
+                    scale.factor = 10000)
+lobe <- FindVariableFeatures(object = lobe,selection.method = "vst",nfeatures = 5000)
+lobe <- ScaleData(object = lobe, features = rownames(x = lobe))
+lobe <- RunPCA(object = lobe, features = VariableFeatures(object =lobe))
+DimPlot(object = lobe)
+ElbowPlot(object = lobe)
+lobe <- FindNeighbors(object = lobe, dims = 1:11)
+lobe <- FindClusters(object = lobe, resolution = 0.05)
+lobe <- RunTSNE(object = lobe, dims = 1:11)
+DimPlot(object = lobe, reduction = "tsne",label = T,pt.size = 0.6)
+FeaturePlot(lobe,cols = c("lightgrey", "red"),features = c('Krt4','Psca','Tacstd2','Sox9'),reduction = 'tsne')
+markers <- FindAllMarkers(lobe, only.pos = TRUE, min.pct = 0.25, logfc.threshold = 0.5)
