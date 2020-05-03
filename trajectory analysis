@@ -1,0 +1,103 @@
+library(monocle)
+
+data_count <- read.csv('count_data.csv',header = T,row.names = 1)
+dim(data_count) #19859  8545
+head(data_count[,1:5])
+cluster <- read.csv('clusters.csv',header=T)
+dim(cluster) #8545    1
+data1 <- data_count[,cluster$Cluster==1]
+data2 <- data_count[,cluster$Cluster==2]
+data7 <- data_count[,cluster$Cluster==7]
+###random select samples 1/3
+dim(data1) #19859  3095
+dim(data2) #19859  2625
+dim(data7) #19859   343
+n1 <- round(3095*1/2)
+n2 <- round(2625*1/2)
+n7 <- round(343*1/2)
+s1 <- colnames(data1)
+s2 <- colnames(data2)
+s7 <- colnames(data7)
+set.seed(1111)
+m1 <- sample(s1,size = n1,replace = F)
+m2 <- sample(s2,size = n2,replace = F)
+m7 <- sample(s7,size = n7,replace = F)
+sdata1 <- data1[,colnames(data1)%in%m1]
+dim(sdata1) # 19859  1032
+sdata2 <- data2[,colnames(data2)%in%m2]
+dim(sdata2) #19859   875
+sdata7 <- data7[,colnames(data7)%in%m7]
+dim(sdata7) #19859   114
+sdata <- cbind(sdata1,sdata2,sdata7) 
+dim(sdata) #19859  2021
+pd1 <- as.data.frame(colnames(sdata1))
+pd2 <- as.data.frame(colnames(sdata2))
+pd7 <- as.data.frame(colnames(sdata7))
+colnames(pd1) <- 'barcodes'
+colnames(pd2) <- 'barcodes'
+colnames(pd7) <- 'barcodes'
+
+pd1$cluster <- rep('luminalA',n1)
+pd2$cluster <- rep('luminalB',n2)
+pd7$cluster <- rep('luminalC',n7)
+pd <- rbind(pd1,pd2,pd7)
+dim(pd) #3032    2
+write.csv(pd,'pd.csv')
+dim(sdata) #19859  2021
+save(sdata,file = 'luminal_data_Count.Rdata')
+
+featureData <- as.data.frame(rownames(sdata))
+dim(featureData)
+head(featureData)
+colnames(featureData) <- 'gene'
+rownames(featureData) <- featureData$gene
+featureData$num_cells_expressed	<- apply(sdata,1,function(x){sum(x!=0)})
+head(featureData)
+write.csv(featureData,'fd.csv')
+##############################
+rm(list = ls())
+load('luminal_data_Count.Rdata')
+dim(sdata)
+data <- as.matrix(sdata)
+pd <- read.csv('pd.csv',header = T,row.names = 1)
+fd <- read.csv('fd.csv',header = T,row.names = 1)
+head(fd)
+head(pd)
+rownames(pd) <- pd$barcodes
+pd <- new("AnnotatedDataFrame", data = pd)
+fd <- new("AnnotatedDataFrame", data = fd)
+head(fd)
+HSMM <- newCellDataSet(data,
+                       phenoData = pd,
+                       featureData = fd,
+                       expressionFamily=negbinomial.size())
+HSMM <- estimateSizeFactors(HSMM)
+HSMM <- estimateDispersions(HSMM)
+HSMM <- detectGenes(HSMM, min_expr = 0.5)
+expressed_genes <- row.names(subset(fData(HSMM),
+                                    num_cells_expressed >= 10))
+#print(head(pData(HSMM)))
+
+
+diff_test_res <- differentialGeneTest(HSMM,fullModelFormulaStr = "~cell_type")
+
+ordering_genes <- row.names (subset(diff_test_res, qval < 0.01))
+
+HSMM <- setOrderingFilter(HSMM, ordering_genes)
+plot_ordering_genes(HSMM)
+HSMM <- reduceDimension(HSMM, max_components = 2,
+                            method = 'DDRTree')
+HSMM <- orderCells(HSMM)
+
+GM_state <- function(cds){
+  if (length(unique(pData(cds)$State)) > 1){
+    T0_counts <- table(pData(cds)$State, pData(cds)$cell_type)[,"luminalC"]
+    return(as.numeric(names(T0_counts)[which(T0_counts == max(T0_counts))]))
+  }else {
+    return (1)
+  }
+}
+HSMM <- orderCells(HSMM, root_state = GM_state(HSMM))
+plot_cell_trajectory(HSMM, color_by = "Pseudotime")
+plot_cell_trajectory(HSMM, color_by = "cell_type")
+plot_cell_trajectory(HSMM, color_by = "State")
