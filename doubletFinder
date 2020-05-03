@@ -1,0 +1,112 @@
+library(ggplot2)
+library(Seurat)
+library(dplyr)
+library(Matrix)
+data <- Read10X(data.dir = "outs+YFP/outs/filtered_gene_bc_matrices_mex/output1_genome/")
+dim(data)
+phentype <- read.csv('figure/seruat/phentype.csv',header = T,row.names = 1)
+CPLP <- CreateSeuratObject(raw.data  = data, min.cells = 8, min.genes = 200, 
+                           project = "10X",meta.data = phentype)
+CPLP
+# 16401 genes across 8545 samples.
+##QC and selecting cells for further analysis
+mito.genes <- grep(pattern = "^mt-", x = rownames(x = CPLP@data), value = TRUE)
+percent.mito <- Matrix::colSums(CPLP@raw.data[mito.genes, ])/Matrix::colSums(CPLP@raw.data)
+# The [[ operator can add columns to object metadata, and is a great place
+# to stash QC stats
+CPLP <- AddMetaData(object = CPLP, metadata = percent.mito, col.name = "percent.mito")
+VlnPlot(object = CPLP, features.plot = c("nGene", "nUMI", "percent.mito"), nCol = 3)
+
+CPLP <- NormalizeData(object = CPLP, normalization.method = "LogNormalize",
+                      scale.factor = 100000)
+##Detection of variable genes across the single cells
+CPLP <- FindVariableFeatures(object = CPLP, selection.method = "mean.var.plot",
+                             mean.cutoff = c(0.0125, 5), dispersion.cutoff = c(0.5, 8))
+CPLP <- FindVariableGenes(object = CPLP, mean.function = ExpMean, dispersion.function = LogVMR, 
+                          x.low.cutoff = 0.0125, x.high.cutoff = 5, y.cutoff = 0.5,y.high.cutoff=8)
+length(x = CPLP@var.genes)#3011
+CPLP <- ScaleData(object = CPLP, vars.to.regress = c("nUMI"))
+#Scaling the data and removing unwanted sources of variation
+CPLP <- RunPCA(object = CPLP, pc.genes = CPLP@var.genes)
+PCAPlot(object = CPLP, dim.1 = 1, dim.2 = 2)
+CPLP <- RunTSNE(object = CPLP, dims.use = 1:10, do.fast = TRUE)
+TSNEPlot(object = CPLP,pt.size=1)
+
+#####################################################
+
+######################################################
+library(DoubletFinder)
+library(Seurat)
+library(Matrix) 
+library(fields) 
+library(KernSmooth) 
+library(modes)
+library(ROCR)
+CPLP <- readRDS('CPLP.rds')
+## Pre-process Seurat object -------------------------------------------------------------------------------------------------
+cluster <- read.csv('/guo/figure/seruat/cluster.csv')
+annotations <- cluster$x
+## pK Identification ---------------------------------------------------------------------------------------------------------
+sweep.res.list_cplp <- paramSweep(CPLP, PCs = 1:10)
+sweep.stats_cplp <- summarizeSweep(sweep.res.list_cplp, GT = FALSE)
+bcmvn_cplp <- find.pK(sweep.stats_cplp)
+
+## Homotypic Doublet Proportion Estimate -------------------------------------------------------------------------------------         ## ex: annotations <- CPLP@meta.data$ClusteringResults
+nExp_poi <- round(0.025*length(CPLP@cell.names))  ## Assuming 2.5%  5% 7.5% 10% 12.5% 15% doublet formation rate - tailor for your dataset
+
+
+## Run DoubletFinder with varying classification stringencies ----------------------------------------------------------------
+CPLP <- doubletFinder(CPLP, PCs = 1:10, pN = 0.25, pK = 0.1, nExp = nExp_poi, reuse.pANN = FALSE)
+## Plot results --------------------------------------------------------------------------------------------------------------
+CPLP@meta.data[,"DF"] <- CPLP@meta.data$DF.classifications_0.25_0.1_214
+
+table(CPLP@meta.data$DF)
+
+write.csv(CPLP@meta.data$DF,'25_p_doublet.csv')
+TSNEPlot(CPLP, group.by="DF", colors.use=c("gold","grey"))
+
+
+###############0.05
+
+nExp_poi <- round(0.05*length(CPLP@cell.names))  ## Assuming 2.5%  5% 7.5% 10% 12.5% 15% doublet formation rate - tailor for your dataset
+CPLP <- doubletFinder(CPLP, PCs = 1:10, pN = 0.25, pK = 0.1, nExp = nExp_poi, reuse.pANN = FALSE)
+CPLP@meta.data[,"DF"] <- CPLP@meta.data$DF.classifications_0.25_0.1_427
+table(CPLP@meta.data$DF)
+write.csv(CPLP@meta.data$DF,'50_p_doublet.csv')
+TSNEPlot(CPLP, group.by="DF", colors.use=c("gold","grey"))
+
+
+##############0.075
+nExp_poi <- round(0.075*length(CPLP@cell.names))  ## Assuming 2.5%  5% 7.5% 10% 12.5% 15% doublet formation rate - tailor for your dataset
+CPLP <- doubletFinder(CPLP, PCs = 1:10, pN = 0.25, pK = 0.1, nExp = nExp_poi, reuse.pANN = FALSE)
+CPLP@meta.data[,"DF"] <- CPLP@meta.data$DF.classifications_0.25_0.1_641
+table(CPLP@meta.data$DF)
+write.csv(CPLP@meta.data$DF,'75_p_doublet.csv')
+TSNEPlot(CPLP, group.by="DF", colors.use=c("gold","grey"))
+
+
+##################0.1
+nExp_poi <- round(0.1*length(CPLP@cell.names))  ## Assuming 2.5%  5% 7.5% 10% 12.5% 15% doublet formation rate - tailor for your dataset
+CPLP <- doubletFinder(CPLP, PCs = 1:10, pN = 0.25, pK = 0.1, nExp = nExp_poi, reuse.pANN = FALSE)
+CPLP@meta.data[,"DF"] <- CPLP@meta.data$DF.classifications_0.25_0.1_854
+table(CPLP@meta.data$DF)
+write.csv(CPLP@meta.data$DF,'100_p_doublet.csv')
+TSNEPlot(CPLP, group.by="DF", colors.use=c("gold","grey"))
+
+
+##################0.125
+nExp_poi <- round(0.125*length(CPLP@cell.names))  ## Assuming 2.5%  5% 7.5% 10% 12.5% 15% doublet formation rate - tailor for your dataset
+CPLP <- doubletFinder(CPLP, PCs = 1:10, pN = 0.25, pK = 0.1, nExp = nExp_poi, reuse.pANN = FALSE)
+CPLP@meta.data[,"DF"] <- CPLP@meta.data$DF.classifications_0.25_0.1_1068
+table(CPLP@meta.data$DF)
+write.csv(CPLP@meta.data$DF,'125_p_doublet.csv')
+TSNEPlot(CPLP, group.by="DF", colors.use=c("gold","grey"))
+
+
+################0.15
+nExp_poi <- round(0.15*length(CPLP@cell.names))  ## Assuming 2.5%  5% 7.5% 10% 12.5% 15% doublet formation rate - tailor for your dataset
+CPLP <- doubletFinder(CPLP, PCs = 1:10, pN = 0.25, pK = 0.1, nExp = nExp_poi, reuse.pANN = FALSE)
+CPLP@meta.data[,"DF"] <- CPLP@meta.data$DF.classifications_0.25_0.1_1282
+table(CPLP@meta.data$DF)
+write.csv(CPLP@meta.data$DF,'150_p_doublet.csv')
+TSNEPlot(CPLP, group.by="DF", colors.use=c("gold","grey"))
